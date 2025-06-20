@@ -1,32 +1,28 @@
-version: "3.8"
 
 services:
   mongo:
     image: mongo:7
     container_name: mongo
     ports:
-      - "27017:27017"
+      - "27018:27017"
     command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
     volumes:
       - mongo_data:/data/db
     networks:
       - sailingLocNet
-
-  init-replica:
-    image: mongo:7
-    depends_on:
-      - mongo
-    entrypoint: ["sh", "-c", "sleep 5 && mongosh --host mongo:27017 --eval 'rs.initiate({_id:\"rs0\", members:[{_id:0, host:\"mongo:27017\"}]})'"]
-    restart: on-failure
-    networks:
-      - sailingLocNet
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
 
   app:
     build: .
     container_name: app
     depends_on:
-      - mongo
-      - init-replica
+      mongo:
+        condition: service_healthy
     ports:
       - "3000:3000"
     environment:

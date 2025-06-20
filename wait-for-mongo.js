@@ -57,24 +57,33 @@ async function checkReplicaSet() {
 }
 
 async function waitForReplicaSet() {
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 15; i++) {
     const client = new MongoClient(uriReplica);
     try {
       await client.connect();
       const result = await client.db("admin").command({ ping: 1 });
-      if (result.ok === 1) {
+
+      // Also check replica set status
+      const status = await client.db("admin").command({ replSetGetStatus: 1 });
+
+      if (result.ok === 1 && status.ok === 1) {
         console.log("✅ Replica set opérationnel");
+        console.log(`📊 Replica set status: ${status.set}, Members: ${status.members.length}`);
         await client.close();
         return;
       }
     } catch (err) {
-      console.log("⏳ Attente replica : ", err.message);
+      console.log(`⏳ Attente replica (tentative ${i + 1}/15): ${err.message}`);
     } finally {
-      await client.close();
+      try {
+        await client.close();
+      } catch (e) {
+        // Ignore close errors
+      }
     }
-    await delay(5000);
+    await delay(3000);
   }
-  console.error("❌ Timeout replica set");
+  console.error("❌ Timeout replica set après 15 tentatives");
   process.exit(1);
 }
 

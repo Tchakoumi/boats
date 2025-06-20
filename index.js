@@ -4,17 +4,35 @@ import { PrismaClient } from "@prisma/client";
 console.log("🚀 App démarrée");
 
 const app = express();
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  log: ['query', 'info', 'warn', 'error'],
+});
 
 app.use(express.json());
 
 app.get("/", async (req, res) => {
   try {
     await prisma.$connect();
-    res.send("Connexion OK à Mongo via Prisma !");
+
+    // Test database connection with a simple query
+    const result = await prisma.$runCommandRaw({
+      ping: 1
+    });
+
+    res.json({
+      message: "Connexion OK à Mongo via Prisma !",
+      database: "Connected",
+      ping: result,
+      timestamp: new Date().toISOString()
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Connexion échouée", details: err.message });
+    console.error("Database connection error:", err);
+    res.status(500).json({
+      error: "Connexion échouée",
+      details: err.message,
+      code: err.code,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
@@ -43,6 +61,29 @@ app.get("/boats", async (req, res) => {
 });
 
 
-app.listen(3000, () => {
+const server = app.listen(3000, () => {
   console.log("Serveur démarré sur http://localhost:3000");
+});
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('🔄 Arrêt graceful...');
+  server.close(() => {
+    console.log('✅ Serveur HTTP fermé.');
+    prisma.$disconnect().then(() => {
+      console.log('✅ Base de données déconnectée.');
+      process.exit(0);
+    });
+  });
+});
+
+process.on('SIGINT', async () => {
+  console.log('🔄 Arrêt graceful...');
+  server.close(() => {
+    console.log('✅ Serveur HTTP fermé.');
+    prisma.$disconnect().then(() => {
+      console.log('✅ Base de données déconnectée.');
+      process.exit(0);
+    });
+  });
 });
