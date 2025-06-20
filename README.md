@@ -78,6 +78,28 @@ npm run dev
 npm run test:elasticsearch
 ```
 
+## 🌱 Database Seeding
+
+Populate your database with realistic fake data using Faker.js:
+
+```bash
+# Seed 50 boats (default)
+npm run seed
+
+# Seed custom number of boats
+npm run seed:boats 100
+
+# View database statistics
+npm run seed:stats
+
+# Clear all boats (development only)
+npm run seed:clear
+```
+
+The seeding system generates realistic boat data including creative names, various boat types (Sailboat, Catamaran, Yacht, etc.), and years from 1970 to present.
+
+📖 **[Full Seeding Documentation](docs/database-seeding.md)**
+
 ## 🚢 Features
 
 - RESTful API for boat management
