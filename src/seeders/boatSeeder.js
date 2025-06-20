@@ -1,5 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { PrismaClient } from '@prisma/client';
+import elasticsearchService from '../services/elasticsearchService.js';
 
 const prisma = new PrismaClient();
 
@@ -64,6 +65,38 @@ const generateBoat = () => {
 };
 
 /**
+ * Index all existing boats in Elasticsearch
+ */
+export const indexExistingBoats = async () => {
+  try {
+    console.log('🔍 Indexing existing boats in Elasticsearch...');
+
+    const boats = await prisma.boat.findMany();
+    let indexed = 0;
+
+    for (const boat of boats) {
+      try {
+        await elasticsearchService.indexBoat(boat);
+        indexed++;
+        if (indexed % 10 === 0) {
+          console.log(`🔍 Indexed ${indexed}/${boats.length} boats...`);
+        }
+      } catch (error) {
+        console.error(`❌ Failed to index boat ${boat.name}:`, error.message);
+      }
+    }
+
+    console.log(`🎉 Successfully indexed ${indexed} existing boats in Elasticsearch!`);
+    return indexed;
+  } catch (error) {
+    console.error('❌ Error indexing existing boats:', error);
+    throw error;
+  } finally {
+    await prisma.$disconnect();
+  }
+};
+
+/**
  * Seed boats into the database (idempotent - safe to run multiple times)
  * @param {number} count - Number of boats to create
  * @param {boolean} force - Force seeding even if data exists
@@ -78,8 +111,17 @@ export const seedBoats = async (count = 50, force = false) => {
     // Skip seeding if data already exists (unless forced)
     if (existingCount > 0 && !force) {
       console.log(`⏭️  Database already contains ${existingCount} boats. Skipping seeding.`);
-      console.log(`   Use --force flag or seed:clear to reseed the database.`);
-      return { created: 0, total: existingCount, skipped: true };
+      console.log(`🔍 Checking if boats are indexed in Elasticsearch...`);
+
+      // Index existing boats in Elasticsearch if they're not already indexed
+      try {
+        const indexed = await indexExistingBoats();
+        console.log(`   Use --force flag or seed:clear to reseed the database.`);
+        return { created: 0, total: existingCount, indexed, skipped: true };
+      } catch (error) {
+        console.error('❌ Failed to index existing boats:', error.message);
+        return { created: 0, total: existingCount, indexed: 0, skipped: true };
+      }
     }
 
     const boats = [];
@@ -87,23 +129,44 @@ export const seedBoats = async (count = 50, force = false) => {
       boats.push(generateBoat());
     }
 
-    // Insert boats in batches for better performance
-    const batchSize = 10;
+            // Create and index boats one by one to ensure proper MongoDB-Elasticsearch sync
     let created = 0;
+    let indexed = 0;
 
-    for (let i = 0; i < boats.length; i += batchSize) {
-      const batch = boats.slice(i, i + batchSize);
-      await prisma.boat.createMany({
-        data: batch
-      });
-      created += batch.length;
-      console.log(`✅ Created ${created}/${count} boats...`);
+    console.log('🔍 Creating boats in MongoDB and indexing in Elasticsearch...');
+
+    for (const boatData of boats) {
+      try {
+        // Create boat in MongoDB
+        const boat = await prisma.boat.create({
+          data: boatData
+        });
+        created++;
+
+        // Index boat in Elasticsearch immediately
+        try {
+          await elasticsearchService.indexBoat(boat);
+          indexed++;
+        } catch (error) {
+          console.error(`❌ Failed to index boat ${boat.name}:`, error.message);
+          // Continue with other boats even if indexing fails
+        }
+
+        // Progress update every 10 boats
+        if (created % 10 === 0) {
+          console.log(`✅ Created ${created}/${count} boats in MongoDB, indexed ${indexed} in Elasticsearch...`);
+        }
+      } catch (error) {
+        console.error(`❌ Failed to create boat:`, error.message);
+        // Continue with other boats even if one fails
+      }
     }
 
     const totalBoats = await prisma.boat.count();
     console.log(`🎉 Successfully seeded ${created} boats! Total boats in database: ${totalBoats}`);
+    console.log(`🔍 Successfully indexed ${indexed} boats in Elasticsearch!`);
 
-    return { created, total: totalBoats, skipped: false };
+    return { created, total: totalBoats, indexed, skipped: false };
   } catch (error) {
     console.error('❌ Error seeding boats:', error);
     throw error;
@@ -113,14 +176,32 @@ export const seedBoats = async (count = 50, force = false) => {
 };
 
 /**
- * Clear all boats from the database
+ * Clear all boats from the database and Elasticsearch
  */
 export const clearBoats = async () => {
   try {
-    console.log('🗑️  Clearing all boats from database...');
+    console.log('🗑️  Clearing all boats from database and Elasticsearch...');
+
+    // Get all boat IDs before deleting
+    const boats = await prisma.boat.findMany({ select: { id: true } });
+
+    // Delete from MongoDB
     const result = await prisma.boat.deleteMany();
-    console.log(`✅ Deleted ${result.count} boats`);
-    return result.count;
+    console.log(`✅ Deleted ${result.count} boats from MongoDB`);
+
+    // Delete from Elasticsearch
+    let elasticDeleted = 0;
+    for (const boat of boats) {
+      try {
+        await elasticsearchService.deleteBoat(boat.id);
+        elasticDeleted++;
+      } catch (error) {
+        console.error(`❌ Failed to delete boat ${boat.id} from Elasticsearch:`, error.message);
+      }
+    }
+    console.log(`🔍 Deleted ${elasticDeleted} boats from Elasticsearch`);
+
+    return { mongodb: result.count, elasticsearch: elasticDeleted };
   } catch (error) {
     console.error('❌ Error clearing boats:', error);
     throw error;

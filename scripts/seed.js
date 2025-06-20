@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import { seedBoats, clearBoats, showBoatStats } from '../src/seeders/boatSeeder.js';
+import { seedBoats, clearBoats, showBoatStats, indexExistingBoats } from '../src/seeders/boatSeeder.js';
 
 // Load environment variables
 dotenv.config();
@@ -12,6 +12,7 @@ dotenv.config();
  *   npm run seed:boats 100    # Seed 100 boats
  *   npm run seed:clear        # Clear all boats
  *   npm run seed:stats        # Show database statistics
+ *   npm run seed:index        # Index existing boats in Elasticsearch
  */
 
 const args = process.argv.slice(2);
@@ -42,8 +43,12 @@ async function main() {
         await clearBoats();
         break;
 
-      case 'stats':
+            case 'stats':
         await showBoatStats();
+        break;
+
+      case 'index':
+        await indexExistingBoats();
         break;
 
       default:
