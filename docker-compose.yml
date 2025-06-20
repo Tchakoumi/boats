@@ -54,7 +54,9 @@ services:
       - DATABASE_URL=mongodb://mongo:27017/sailingLoc?replicaSet=rs0
       - ELASTICSEARCH_URL=http://elasticsearch:9200
       - NODE_ENV=development
-    command: sh -c "node wait-for-mongo.js && node wait-for-elasticsearch.js && npx prisma db push && npm run dev"
+      - SEED_COUNT=100
+      # - SKIP_SEEDING=true  # Uncomment to disable seeding
+    command: sh -c "node wait-for-mongo.js && node wait-for-elasticsearch.js && npx prisma db push && node scripts/docker-init.js && npm run dev"
     volumes:
       - .:/app
       - /app/node_modules
