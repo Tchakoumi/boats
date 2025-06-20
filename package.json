@@ -1,8 +1,8 @@
 {
   "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js",
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
     "test:elasticsearch": "node test-elasticsearch.js"
   },
   "dependencies": {

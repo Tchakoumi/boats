@@ -1,8 +1,7 @@
-import dotenv from "dotenv";
-dotenv.config();
 import { Client } from "@elastic/elasticsearch";
+import { config } from "../config/environment.js";
 
-const ELASTICSEARCH_URL = process.env.ELASTICSEARCH_URL;
+const ELASTICSEARCH_URL = config.elasticsearch.url;
 const INDEX_NAME = "boats";
 
 class ElasticsearchService {
