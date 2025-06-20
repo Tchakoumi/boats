@@ -1,11 +1,12 @@
 import express from "express";
 import { PrismaClient } from "@prisma/client";
+import elasticsearchService from "./elasticsearch.js";
 
 console.log("🚀 App démarrée");
 
 const app = express();
 const prisma = new PrismaClient({
-  log: ['query', 'info', 'warn', 'error'],
+  log: ["query", "info", "warn", "error"],
 });
 
 app.use(express.json());
@@ -15,15 +16,19 @@ app.get("/", async (req, res) => {
     await prisma.$connect();
 
     // Test database connection with a simple query
-    const result = await prisma.$runCommandRaw({
-      ping: 1
+    const mongoResult = await prisma.$runCommandRaw({
+      ping: 1,
     });
 
+    // Test Elasticsearch connection
+    const elasticsearchHealth = await elasticsearchService.getHealth();
+
     res.json({
-      message: "Connexion OK à Mongo via Prisma !",
+      message: "Connexion OK à Mongo et Elasticsearch !",
       database: "Connected",
-      ping: result,
-      timestamp: new Date().toISOString()
+      mongoPing: mongoResult,
+      elasticsearch: elasticsearchHealth,
+      timestamp: new Date().toISOString(),
     });
   } catch (err) {
     console.error("Database connection error:", err);
@@ -31,11 +36,10 @@ app.get("/", async (req, res) => {
       error: "Connexion échouée",
       details: err.message,
       code: err.code,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 });
-
 
 app.post("/boats", async (req, res) => {
   const { name, type, year } = req.body;
@@ -43,6 +47,10 @@ app.post("/boats", async (req, res) => {
     const boat = await prisma.Boat.create({
       data: { name, type, year: parseInt(year) },
     });
+
+    // Index the boat in Elasticsearch
+    await elasticsearchService.indexBoat(boat);
+
     res.status(201).json(boat);
   } catch (error) {
     console.error("Erreur :", error);
@@ -57,8 +65,8 @@ app.get("/boats", async (req, res) => {
         id: true,
         name: true,
         type: true,
-        year: true
-      }
+        year: true,
+      },
     });
     res.json(boats);
   } catch (error) {
@@ -77,16 +85,22 @@ app.put("/boats/:id", async (req, res) => {
       data: {
         ...(name && { name }),
         ...(type && { type }),
-        ...(year && { year: parseInt(year) })
+        ...(year && { year: parseInt(year) }),
       },
     });
+
+    // Update the boat in Elasticsearch
+    await elasticsearchService.updateBoat(boat);
+
     res.json(boat);
   } catch (error) {
     console.error("Erreur lors de la mise à jour du bateau :", error);
-    if (error.code === 'P2025') {
+    if (error.meta.body.status === 404) {
       res.status(404).json({ error: "Bateau non trouvé" });
     } else {
-      res.status(500).json({ error: "Erreur lors de la mise à jour du bateau" });
+      res.status(500).json({
+        error: `Erreur lors de la mise à jour du bateau`,
+      });
     }
   }
 });
@@ -98,39 +112,94 @@ app.delete("/boats/:id", async (req, res) => {
     await prisma.Boat.delete({
       where: { id },
     });
+
+    // Delete the boat from Elasticsearch
+    await elasticsearchService.deleteBoat(id);
+
     res.status(204).send();
   } catch (error) {
     console.error("Erreur lors de la suppression du bateau :", error);
-    if (error.code === 'P2025') {
+    if (error.code === "P2025") {
       res.status(404).json({ error: "Bateau non trouvé" });
     } else {
-      res.status(500).json({ error: "Erreur lors de la suppression du bateau" });
+      res
+        .status(500)
+        .json({ error: "Erreur lors de la suppression du bateau" });
     }
   }
 });
 
-const server = app.listen(3000, () => {
-  console.log("Serveur démarré sur http://localhost:3000");
+// Search boats endpoint
+app.get("/boats/search", async (req, res) => {
+  try {
+    const { q, type, year, yearMin, yearMax } = req.query;
+
+    const filters = {};
+    if (type) filters.type = type;
+    if (year) filters.year = parseInt(year);
+    if (yearMin || yearMax) {
+      filters.yearRange = {};
+      if (yearMin) filters.yearRange.min = parseInt(yearMin);
+      if (yearMax) filters.yearRange.max = parseInt(yearMax);
+    }
+
+    const results = await elasticsearchService.searchBoats(q, filters);
+    res.json(results);
+  } catch (error) {
+    console.error("Erreur lors de la recherche :", error);
+    res.status(500).json({ error: "Erreur lors de la recherche de bateaux" });
+  }
+});
+
+// Elasticsearch health endpoint
+app.get("/elasticsearch/health", async (req, res) => {
+  try {
+    const health = await elasticsearchService.getHealth();
+    res.json(health);
+  } catch (error) {
+    console.error("Erreur lors de la vérification d'Elasticsearch :", error);
+    res
+      .status(500)
+      .json({ error: "Erreur lors de la vérification d'Elasticsearch" });
+  }
+});
+
+// Initialize Elasticsearch index
+async function initializeServices() {
+  try {
+    await elasticsearchService.initializeIndex();
+    console.log("🔍 Elasticsearch initialisé avec succès");
+  } catch (error) {
+    console.error(
+      "❌ Erreur lors de l'initialisation d'Elasticsearch :",
+      error
+    );
+  }
+}
+
+const server = app.listen(process.env.PORT, async () => {
+  console.log(`Serveur démarré sur http://localhost:${process.env.PORT}`);
+  await initializeServices();
 });
 
 // Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('🔄 Arrêt graceful...');
+process.on("SIGTERM", async () => {
+  console.log("🔄 Arrêt graceful...");
   server.close(() => {
-    console.log('✅ Serveur HTTP fermé.');
+    console.log("✅ Serveur HTTP fermé.");
     prisma.$disconnect().then(() => {
-      console.log('✅ Base de données déconnectée.');
+      console.log("✅ Base de données déconnectée.");
       process.exit(0);
     });
   });
 });
 
-process.on('SIGINT', async () => {
-  console.log('🔄 Arrêt graceful...');
+process.on("SIGINT", async () => {
+  console.log("🔄 Arrêt graceful...");
   server.close(() => {
-    console.log('✅ Serveur HTTP fermé.');
+    console.log("✅ Serveur HTTP fermé.");
     prisma.$disconnect().then(() => {
-      console.log('✅ Base de données déconnectée.');
+      console.log("✅ Base de données déconnectée.");
       process.exit(0);
     });
   });
