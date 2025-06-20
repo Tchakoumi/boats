@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import { PrismaClient } from "@prisma/client";
 import elasticsearchService from "./elasticsearch.js";
@@ -177,8 +180,8 @@ async function initializeServices() {
   }
 }
 
-const server = app.listen(process.env.PORT, async () => {
-  console.log(`Serveur démarré sur http://localhost:${process.env.PORT}`);
+const server = app.listen(process.env.APP_PORT || 3000, async () => {
+  console.log(`Serveur démarré sur http://localhost:${process.env.APP_PORT || 3000}`);
   await initializeServices();
 });
 

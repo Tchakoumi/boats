@@ -1,3 +1,5 @@
+import dotenv from "dotenv";
+dotenv.config();
 import { Client } from "@elastic/elasticsearch";
 
 const ELASTICSEARCH_URL = process.env.ELASTICSEARCH_URL;
