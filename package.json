@@ -1,7 +1,8 @@
 {
   "type": "module",
   "scripts": {
-    "dev": "node index.js"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
   "dependencies": {
     "@prisma/client": "^6.10.1",
@@ -9,6 +10,7 @@
     "mongodb": "^6.17.0"
   },
   "devDependencies": {
+    "nodemon": "^3.0.2",
     "prisma": "^6.10.1"
   }
 }

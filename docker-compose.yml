@@ -18,7 +18,9 @@ services:
       start_period: 40s
 
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     container_name: app
     depends_on:
       mongo:
@@ -27,9 +29,11 @@ services:
       - "3000:3000"
     environment:
       - DATABASE_URL=mongodb://mongo:27017/sailingLoc?replicaSet=rs0
-    command: sh -c "node wait-for-mongo.js && npx prisma db push && node index.js"
+      - NODE_ENV=development
+    command: sh -c "node wait-for-mongo.js && npx prisma db push && npm run dev"
     volumes:
       - .:/app
+      - /app/node_modules
     networks:
       - sailingLocNet
 
