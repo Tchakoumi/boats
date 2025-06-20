@@ -8,6 +8,7 @@ The seeding system automatically generates realistic boat data including:
 - **Boat names**: Creative combinations using adjectives, nouns, locations, and person names
 - **Boat types**: Variety of sailing vessels (Sailboat, Catamaran, Yacht, Dinghy, etc.)
 - **Years**: Random years between 1970 and current year
+- **Elasticsearch Integration**: All boats are automatically indexed for search functionality
 
 ## Quick Start
 
@@ -50,11 +51,12 @@ npm run seed:clear
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `npm run seed` | Seed 50 boats (idempotent) | `npm run seed` |
-| `npm run seed:boats <count>` | Seed specific number of boats | `npm run seed:boats 200` |
-| `npm run seed:force` | Force reseed 50 boats (ignores existing) | `npm run seed:force` |
-| `npm run seed:clear` | Remove all boats from database | `npm run seed:clear` |
+| `npm run seed` | Seed 50 boats (idempotent) + Elasticsearch index | `npm run seed` |
+| `npm run seed:boats <count>` | Seed specific number of boats + index | `npm run seed:boats 200` |
+| `npm run seed:force` | Force reseed 50 boats + reindex | `npm run seed:force` |
+| `npm run seed:clear` | Remove boats from MongoDB + Elasticsearch | `npm run seed:clear` |
 | `npm run seed:stats` | Show database statistics | `npm run seed:stats` |
+| `npm run seed:index` | Index existing boats in Elasticsearch | `npm run seed:index` |
 | `npm run docker:init` | Docker initialization script | `npm run docker:init` |
 
 ## Data Generation Details
@@ -126,10 +128,11 @@ environment:
 ```
 
 ### Docker Seeding Behavior
-- **First Run**: Populates database with sample data
-- **Subsequent Runs**: Skips seeding (idempotent behavior)
+- **First Run**: Populates database with sample data + indexes in Elasticsearch
+- **Subsequent Runs**: Skips seeding but ensures Elasticsearch indexing (idempotent)
 - **Production**: Automatically disabled
 - **Failure Safe**: App starts even if seeding fails
+- **Smart Indexing**: Automatically indexes existing boats if not already indexed
 
 ### Controlling Docker Seeding
 
@@ -161,6 +164,15 @@ To force reseeding in Docker environment:
 - **Smart Detection**: Checks if data already exists before seeding
 - **No Duplicates**: Won't create duplicate data on container restarts
 - **Safe Restarts**: Container can be restarted without data corruption
+- **Elasticsearch Sync**: Automatically ensures boats are indexed even on restarts
+
+### Elasticsearch Integration
+- **Automatic Indexing**: All seeded boats are automatically indexed in Elasticsearch
+- **Search Ready**: Boats are immediately searchable via `/boats/search` endpoint
+- **Dual Database Sync**: Maintains consistency between MongoDB and Elasticsearch
+- **Individual Indexing**: Each boat is indexed immediately after creation
+- **Error Resilient**: Continues seeding even if individual boat indexing fails
+- **Existing Boat Indexing**: Automatically indexes existing boats that weren't previously indexed
 
 ### Production Protection
 - Database clearing is **disabled** in production environment
@@ -277,6 +289,21 @@ npm run seed:stats  # or: docker compose exec app npm run seed:stats
 
 # Add more data without clearing
 npm run seed:boats 50  # or: docker compose exec app npm run seed:boats 50
+
+# Index existing boats in Elasticsearch (if needed)
+npm run seed:index  # or: docker compose exec app npm run seed:index
+```
+
+### Testing Elasticsearch Search
+```bash
+# Search for yachts
+curl "http://localhost:3000/boats/search?q=yacht"
+
+# Search by boat type
+curl "http://localhost:3000/boats/search?type=Catamaran"
+
+# Search with year filter
+curl "http://localhost:3000/boats/search?q=cruiser&yearMin=2000"
 ```
 
 ## Troubleshooting
