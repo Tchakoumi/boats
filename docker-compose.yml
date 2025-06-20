@@ -17,6 +17,27 @@ services:
       retries: 5
       start_period: 40s
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - sailingLocNet
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
   app:
     build:
       context: .
@@ -25,12 +46,15 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
     ports:
       - "3000:3000"
     environment:
       - DATABASE_URL=mongodb://mongo:27017/sailingLoc?replicaSet=rs0
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
       - NODE_ENV=development
-    command: sh -c "node wait-for-mongo.js && npx prisma db push && npm run dev"
+    command: sh -c "node wait-for-mongo.js && node wait-for-elasticsearch.js && npx prisma db push && npm run dev"
     volumes:
       - .:/app
       - /app/node_modules
@@ -39,6 +63,7 @@ services:
 
 volumes:
   mongo_data:
+  elasticsearch_data:
 
 networks:
   sailingLocNet:
