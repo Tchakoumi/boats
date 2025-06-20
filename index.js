@@ -52,7 +52,14 @@ app.post("/boats", async (req, res) => {
 
 app.get("/boats", async (req, res) => {
   try {
-    const boats = await prisma.Boat.findMany();
+    const boats = await prisma.Boat.findMany({
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        year: true
+      }
+    });
     res.json(boats);
   } catch (error) {
     console.error("Erreur lors de la récupération des bateaux :", error);
@@ -60,6 +67,47 @@ app.get("/boats", async (req, res) => {
   }
 });
 
+app.put("/boats/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, type, year } = req.body;
+
+  try {
+    const boat = await prisma.Boat.update({
+      where: { id },
+      data: {
+        ...(name && { name }),
+        ...(type && { type }),
+        ...(year && { year: parseInt(year) })
+      },
+    });
+    res.json(boat);
+  } catch (error) {
+    console.error("Erreur lors de la mise à jour du bateau :", error);
+    if (error.code === 'P2025') {
+      res.status(404).json({ error: "Bateau non trouvé" });
+    } else {
+      res.status(500).json({ error: "Erreur lors de la mise à jour du bateau" });
+    }
+  }
+});
+
+app.delete("/boats/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    await prisma.Boat.delete({
+      where: { id },
+    });
+    res.status(204).send();
+  } catch (error) {
+    console.error("Erreur lors de la suppression du bateau :", error);
+    if (error.code === 'P2025') {
+      res.status(404).json({ error: "Bateau non trouvé" });
+    } else {
+      res.status(500).json({ error: "Erreur lors de la suppression du bateau" });
+    }
+  }
+});
 
 const server = app.listen(3000, () => {
   console.log("Serveur démarré sur http://localhost:3000");
