@@ -14,6 +14,7 @@
     "seed:force": "node scripts/seed.js boats 50 --force",
     "seed:clear": "node scripts/seed.js clear",
     "seed:stats": "node scripts/seed.js stats",
+    "seed:index": "node scripts/seed.js index",
     "docker:init": "node scripts/docker-init.js"
   },
   "dependencies": {
