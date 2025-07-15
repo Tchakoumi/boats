@@ -140,6 +140,33 @@ describe('Boat Endpoints', () => {
       expect(response.body.error).toBe('Name is required and must be a non-empty string');
     });
 
+    it('should fail to create boat with tab-only name', async () => {
+      const response = await request(app)
+        .post('/boats')
+        .send({ ...validBoat, name: '\t\t' })
+        .expect(400);
+
+      expect(response.body.error).toBe('Name is required and must be a non-empty string');
+    });
+
+    it('should fail to create boat with newline-only name', async () => {
+      const response = await request(app)
+        .post('/boats')
+        .send({ ...validBoat, name: '\n\n' })
+        .expect(400);
+
+      expect(response.body.error).toBe('Name is required and must be a non-empty string');
+    });
+
+    it('should fail to create boat with mixed whitespace name', async () => {
+      const response = await request(app)
+        .post('/boats')
+        .send({ ...validBoat, name: ' \t\n ' })
+        .expect(400);
+
+      expect(response.body.error).toBe('Name is required and must be a non-empty string');
+    });
+
     it('should fail to create boat without type', async () => {
       const response = await request(app)
         .post('/boats')
