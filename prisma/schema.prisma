@@ -10,9 +10,22 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum BoatType {
+  Sailboat
+  Motorboat
+  Yacht
+  FishingBoat
+  Houseboat
+  Canoe
+  Kayak
+  Ferry
+  Speedboat
+  Tugboat
+}
+
 model Boat {
-  id   String @id @default(auto()) @map("_id") @db.ObjectId
+  id   String   @id @default(auto()) @map("_id") @db.ObjectId
   name String
-  type String
+  type BoatType
   year Int
 }
