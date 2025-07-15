@@ -5,23 +5,19 @@ import elasticsearchService from '../services/elasticsearchService.js';
 const prisma = new PrismaClient();
 
 /**
- * Boat types commonly used in sailing
+ * Boat types that match the BoatType enum in schema.prisma
  */
 const BOAT_TYPES = [
   'Sailboat',
-  'Catamaran',
+  'Motorboat',
   'Yacht',
-  'Dinghy',
-  'Ketch',
-  'Sloop',
-  'Schooner',
-  'Trimaran',
-  'Monohull',
-  'Cruiser',
-  'Racer',
-  'Motor Yacht',
-  'Fishing Boat',
-  'Speedboat'
+  'FishingBoat',
+  'Houseboat',
+  'Canoe',
+  'Kayak',
+  'Ferry',
+  'Speedboat',
+  'Tugboat'
 ];
 
 /**
