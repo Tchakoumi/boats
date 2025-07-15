@@ -14,7 +14,7 @@ const BoatType = z.enum([
 ]);
 
 const boatSchema = z.object({
-  name: z.string().min(1, "Name is required and must be a non-empty string"),
+  name: z.string().trim().min(1, "Name is required and must be a non-empty string"),
   type: BoatType,
   year: z.number().int().min(1800, "Year must be at least 1800").max(new Date().getFullYear() + 10, "Year cannot be more than 10 years in the future")
 });
@@ -27,7 +27,7 @@ const validateBoat = (isUpdate = false) => (req, res, next) => {
     next();
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: error.errors?.[0]?.message || "Validation error"
       });
     }
