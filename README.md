@@ -96,7 +96,7 @@ npm run seed:stats
 npm run seed:clear
 ```
 
-The seeding system generates realistic boat data including creative names, various boat types (Sailboat, Catamaran, Yacht, etc.), and years from 1970 to present. **All boats are automatically indexed in Elasticsearch** for full search functionality.
+The seeding system generates realistic boat data including creative names, various boat types (Sailboat, Motorboat, Yacht, FishingBoat, etc.), and years from 1970 to present. **All boats are automatically indexed in Elasticsearch** for full search functionality.
 
 📖 **[Full Seeding Documentation](docs/database-seeding.md)**
 

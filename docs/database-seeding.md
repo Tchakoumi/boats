@@ -70,21 +70,17 @@ The system generates creative boat names using several patterns:
 - **Adjective + Ocean**: "Serene Atlantic", "Majestic Pacific"
 
 ### Boat Types
-The following sailing vessel types are included:
+The following boat types are included (matching the BoatType enum in schema.prisma):
 - Sailboat
-- Catamaran
+- Motorboat  
 - Yacht
-- Dinghy
-- Ketch
-- Sloop
-- Schooner
-- Trimaran
-- Monohull
-- Cruiser
-- Racer
-- Motor Yacht
-- Fishing Boat
+- FishingBoat
+- Houseboat
+- Canoe
+- Kayak
+- Ferry
 - Speedboat
+- Tugboat
 
 ### Years
 - **Range**: 1970 to current year
