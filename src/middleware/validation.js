@@ -1,35 +1,26 @@
-export const validateBoat = (req, res, next) => {
-  const { name, type, year } = req.body;
+import { z } from 'zod';
 
-  if (!name || typeof name !== 'string' || name.trim().length === 0) {
-    return res.status(400).json({ error: "Name is required and must be a non-empty string" });
+const boatSchema = z.object({
+  name: z.string().min(1, "Name is required and must be a non-empty string"),
+  type: z.string().min(1, "Type is required and must be a non-empty string"),
+  year: z.number().int().min(1800, "Year must be at least 1800").max(new Date().getFullYear() + 10, "Year cannot be more than 10 years in the future")
+});
+
+const validateBoat = (isUpdate = false) => (req, res, next) => {
+  try {
+    const schema = isUpdate ? boatSchema.partial() : boatSchema;
+    const parsed = schema.parse(req.body);
+    req.body = parsed;
+    next();
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ 
+        error: error.errors[0].message 
+      });
+    }
+    return res.status(400).json({ error: "Invalid input" });
   }
-
-  if (!type || typeof type !== 'string' || type.trim().length === 0) {
-    return res.status(400).json({ error: "Type is required and must be a non-empty string" });
-  }
-
-  if (!year || !Number.isInteger(Number(year)) || Number(year) < 1800 || Number(year) > new Date().getFullYear() + 10) {
-    return res.status(400).json({ error: "Year is required and must be a valid year" });
-  }
-
-  next();
 };
 
-export const validateBoatUpdate = (req, res, next) => {
-  const { name, type, year } = req.body;
-
-  if (name !== undefined && (typeof name !== 'string' || name.trim().length === 0)) {
-    return res.status(400).json({ error: "Name must be a non-empty string" });
-  }
-
-  if (type !== undefined && (typeof type !== 'string' || type.trim().length === 0)) {
-    return res.status(400).json({ error: "Type must be a non-empty string" });
-  }
-
-  if (year !== undefined && (!Number.isInteger(Number(year)) || Number(year) < 1800 || Number(year) > new Date().getFullYear() + 10)) {
-    return res.status(400).json({ error: "Year must be a valid year" });
-  }
-
-  next();
-};
+export { validateBoat };
+export const validateBoatUpdate = validateBoat(true);
