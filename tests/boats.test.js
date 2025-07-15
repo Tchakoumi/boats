@@ -29,6 +29,11 @@ describe('Boat Endpoints', () => {
       type: '',
       year: 2020
     },
+    invalidType: {
+      name: 'Ocean Explorer',
+      type: 'InvalidBoatType',
+      year: 2020
+    },
     missingYear: {
       name: 'Ocean Explorer',
       type: 'Sailboat'
@@ -151,6 +156,15 @@ describe('Boat Endpoints', () => {
         .expect(400);
 
       expect(response.body.error).toBe('Type is required and must be a non-empty string');
+    });
+
+    it('should fail to create boat with invalid type', async () => {
+      const response = await request(app)
+        .post('/boats')
+        .send(invalidBoats.invalidType)
+        .expect(400);
+
+      expect(response.body.error).toContain('Invalid enum value');
     });
 
     it('should fail to create boat without year', async () => {

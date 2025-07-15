@@ -35,6 +35,11 @@ describe('Comprehensive Boat API Tests', () => {
       type: '',
       year: 2020
     },
+    invalidType: {
+      name: 'Ocean Explorer',
+      type: 'InvalidBoatType',
+      year: 2020
+    },
     missingYear: {
       name: 'Ocean Explorer',
       type: 'Sailboat'
@@ -166,6 +171,15 @@ describe('Comprehensive Boat API Tests', () => {
       expect(response.body.error).toBe('Type is required and must be a non-empty string');
     });
 
+    it('should fail to create boat with invalid type', async () => {
+      const response = await request(app)
+        .post('/boats')
+        .send(invalidBoats.invalidType);
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('Invalid enum value');
+    });
+
     it('should fail to create boat without year', async () => {
       const response = await request(app)
         .post('/boats')
@@ -241,7 +255,7 @@ describe('Comprehensive Boat API Tests', () => {
     });
 
     it('should handle different boat types', async () => {
-      const boatTypes = ['Sailboat', 'Motorboat', 'Yacht', 'Catamaran', 'Speedboat'];
+      const boatTypes = ['Sailboat', 'Motorboat', 'Yacht', 'FishingBoat', 'Speedboat'];
 
       for (let i = 0; i < boatTypes.length; i++) {
         const boat = { ...validBoat, name: `${boatTypes[i]} Test`, type: boatTypes[i] };
