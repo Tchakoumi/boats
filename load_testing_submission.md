@@ -195,51 +195,264 @@ async createBoat(boatData) {
 - Requêtes/seconde : 60-80 RPS
 - Charge CPU/DB : 60-75%
 
-**Pics exceptionnels (salons nautiques, promotions)** :
+**Pics exceptionnels (salons nautiques, promotions, F1 Monaco)** :
 
 - Utilisateurs simultanés : 800-1,200
 - Requêtes/seconde : 150-200 RPS
 - Charge CPU/DB : 85-95%
 
-### Configuration JSON pour tests de charge
+### Configuration Artillery (YAML) pour tests de charge
 
-```json
-{
-  "load_scenarios": {
-    "normal_hours": {
-      "users_concurrent": 200,
-      "duration_minutes": 60,
-      "rps_target": 30,
-      "load_pattern": "steady"
-    },
-    "peak_hours": {
-      "users_concurrent": 400,
-      "duration_minutes": 180,
-      "rps_target": 70,
-      "load_pattern": "ramp-up: 5min -> plateau: 170min -> down: 5min"
-    },
-    "stress_test": {
-      "users_concurrent": 1000,
-      "duration_minutes": 30,
-      "rps_target": 180,
-      "load_pattern": "ramp-up: 10min -> plateau: 15min -> down: 5min"
-    }
-  },
-  "api_endpoints_distribution": {
-    "GET /boats": 35,
-    "GET /boats/search": 25,
-    "POST /boats": 15,
-    "PUT /boats/:id": 15,
-    "DELETE /boats/:id": 5,
-    "GET /": 5
-  },
-  "user_behavior_model": {
-    "think_time_seconds": 2,
-    "session_duration_minutes": 15,
-    "actions_per_session": 8
-  }
-}
+#### A. Test Normal Hours (`tests/load/normal-hours.yml`)
+```yaml
+config:
+  target: 'http://localhost:3000'
+  phases:
+    - duration: 60
+      arrivalRate: 30
+      name: "Normal hours load test"
+  defaults:
+    headers:
+      Content-Type: 'application/json'
+  payload:
+    path: './data/boats.csv'
+    fields: [name, type, year]
+  processor: './processors/boat-processor.js'
+
+scenarios:
+  - name: "Normal business hours user behavior"
+    weight: 100
+    flow:
+      - get:
+          url: "/"
+          weight: 5
+      - get:
+          url: "/boats"
+          weight: 35
+          expect: [statusCode: 200]
+      - get:
+          url: "/boats/search"
+          qs:
+            q: "{{ $randomString() }}"
+            type: "{{ $randomPick(['Sailboat', 'Motorboat', 'Yacht']) }}"
+          weight: 25
+      - post:
+          url: "/boats"
+          json:
+            name: "{{ name }}"
+            type: "{{ type }}" 
+            year: "{{ year }}"
+          weight: 15
+      - think: 2
 ```
+
+#### B. Test Peak Hours (`tests/load/peak-hours.yml`)
+```yaml
+config:
+  target: 'http://localhost:3000'
+  phases:
+    - duration: 300      # 5min ramp up
+      arrivalRate: 10
+      rampTo: 70
+    - duration: 10200    # 170min plateau
+      arrivalRate: 70
+    - duration: 300      # 5min ramp down
+      arrivalRate: 70
+      rampTo: 10
+
+scenarios:
+  # Marina professionals - 40% traffic
+  - name: "Marina professional workflow"
+    weight: 40
+    flow:
+      - loop:
+          - get: { url: "/boats" }
+          - post: 
+              url: "/boats"
+              json:
+                name: "Marina {{ $randomString() }}"
+                type: "{{ $randomPick(['Ferry', 'Tugboat', 'Yacht']) }}"
+          - think: 1
+        count: 3
+        
+  # Brokers - 35% traffic  
+  - name: "Broker search workflow"
+    weight: 35
+    flow:
+      - loop:
+          - get:
+              url: "/boats/search"
+              qs:
+                q: "{{ $randomPick(['luxury', 'sport', 'classic']) }}"
+                type: "Yacht"
+          - think: 0.5
+        count: 5
+```
+
+#### C. Stress Test (`tests/load/stress-test.yml`)
+```yaml
+config:
+  target: 'http://localhost:3000'
+  phases:
+    - duration: 600      # 10min aggressive ramp
+      arrivalRate: 20
+      rampTo: 180
+    - duration: 900      # 15min maximum stress
+      arrivalRate: 180
+    - duration: 300      # 5min ramp down
+      arrivalRate: 180
+      rampTo: 10
+  defaults:
+    timeout: 30
+
+scenarios:
+  - name: "High-intensity mixed operations"
+    weight: 100
+    flow:
+      - parallel:
+          - get: { url: "/boats", expect: [statusCode: [200, 500, 503]] }
+          - get: { url: "/boats/search", expect: [statusCode: [200, 500, 503]] }
+          - post:
+              url: "/boats"
+              json:
+                name: "Stress {{ $randomString() }}"
+                type: "{{ $randomPick(['Sailboat', 'Motorboat']) }}"
+              expect: [statusCode: [201, 400, 500, 503]]
+      - think: 0.1
+```
+
+### Exécution des tests
+
+#### Structure des fichiers de tests
+```
+tests/load/
+├── normal-hours.yml      # Test heures normales (30 RPS, 60 min)
+├── peak-hours.yml        # Test heures de pointe (70 RPS, 3h)  
+├── stress-test.yml       # Test de stress (180 RPS, 30 min)
+├── run-tests.sh          # Script d'exécution automatisé
+├── data/
+│   └── boats.csv         # Données de test réalistes
+├── processors/
+│   └── boat-processor.js # Processeur Artillery personnalisé
+└── reports/              # Rapports générés automatiquement
+```
+
+#### A. Installation et prérequis
+```bash
+# Installation Artillery globalement
+npm install -g artillery
+
+# Configuration Artillery Cloud (optionnel mais recommandé)
+# Ajoutez votre clé Artillery dans le fichier .env :
+echo "ARTILLERY_KEY=your_artillery_cloud_key_here" >> .env
+
+# Démarrage de l'API SailingLoc
+npm run dev
+# ou
+docker-compose up
+
+# Vérification que l'API répond
+curl http://localhost:3000/
+```
+
+**Artillery Cloud Integration** :
+- Dashboard temps réel avec graphiques avancés
+- Historique des performances et tendances
+- Alertes automatiques sur seuils SLA
+- Collaboration équipe et partage de rapports
+- Métriques détaillées par endpoint
+
+#### B. Exécution des tests (Recommandé)
+```bash
+cd tests/load
+./run-tests.sh
+```
+
+**Le script détecte automatiquement votre configuration** :
+- ☁️ **Avec ARTILLERY_KEY** : Upload automatique vers Artillery Cloud
+- 💻 **Sans ARTILLERY_KEY** : Rapports locaux JSON/HTML
+
+**Menu interactif disponible** :
+1. Test Normal Hours (60s, 30 RPS) + Dashboard cloud
+2. Test Peak Hours (3h, 70 RPS) + Monitoring temps réel  
+3. Test Stress (30min, 180 RPS) + Alertes automatiques
+4. Tous les tests (séquentiel) + Analyse complète
+5. Test rapide (10 VUs × 10 requêtes) + Validation immédiate
+
+**Tags automatiques pour organisation** :
+- `environment:load-test`
+- `service:sailingloc` 
+- `scenario:[normal-hours|peak-hours|stress-test]`
+- `team:backend`
+- `timestamp:YYYYMMDD-HHMMSS`
+
+#### C. Exécution manuelle
+
+**Avec Artillery Cloud (recommandé)** :
+```bash
+# Export de la clé depuis .env
+export ARTILLERY_KEY=$(grep ARTILLERY_KEY ../../.env | cut -d'=' -f2)
+
+# Test heures normales avec upload cloud
+artillery run normal-hours.yml --record --key $ARTILLERY_KEY \
+  --tag environment:load-test --tag service:sailingloc --tag scenario:normal-hours
+
+# Test heures de pointe avec monitoring temps réel
+artillery run peak-hours.yml --record --key $ARTILLERY_KEY \
+  --tag environment:load-test --tag service:sailingloc --tag scenario:peak-hours
+
+# Test de stress avec alertes automatiques
+artillery run stress-test.yml --record --key $ARTILLERY_KEY \
+  --tag environment:load-test --tag service:sailingloc --tag scenario:stress-test
+```
+
+**Mode local (sans clé)** :
+```bash
+# Test heures normales
+artillery run normal-hours.yml --output reports/normal-$(date +%Y%m%d).json
+
+# Génération de rapport HTML
+artillery report reports/normal-20241216.json
+```
+
+#### D. Test rapide de validation
+```bash
+# Avec Artillery Cloud
+artillery quick http://localhost:3000/boats --count 10 --num 10 \
+  --record --key $ARTILLERY_KEY --tag environment:quick-test --tag service:sailingloc
+
+# Mode local
+artillery quick http://localhost:3000/boats --count 10 --num 10
+
+# Explication des paramètres :
+# --count 10 : 10 utilisateurs virtuels simultanés
+# --num 10   : chaque utilisateur fait 10 requêtes
+# Total      : 100 requêtes de validation rapide
+```
+
+### Monitoring pendant les tests
+
+#### Surveillance système
+```bash
+# Ressources système
+htop
+
+# Conteneurs Docker
+docker stats
+
+# Logs de l'application
+docker-compose logs -f app
+
+# Santé Elasticsearch
+curl http://localhost:9200/_cluster/health
+```
+
+#### Métriques surveillées automatiquement
+- **Response time** (p50, p95, p99)
+- **Request rate** (RPS réel)
+- **Error rate** (% requêtes échouées)
+- **Throughput** (requêtes/seconde)
+- **Resource usage** (CPU, mémoire)
 
 ### Objectifs de performance
 
