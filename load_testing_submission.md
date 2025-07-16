@@ -471,6 +471,8 @@ curl http://localhost:9200/_cluster/health
 - Utilisation mémoire > 85%
 
 ## ✅ 4. Plan d'actions correctives
+<img width="1952" height="1106" alt="image" src="https://github.com/user-attachments/assets/7066da96-2849-4dd6-8f37-1491430dff34" />
+
 
 ### Matrice des actions correctives par endpoint
 
