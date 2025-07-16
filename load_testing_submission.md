@@ -478,10 +478,10 @@ curl http://localhost:9200/_cluster/health
 
 | Endpoint            | KPI Observé | Seuil   | Problème                      | Action Corrective                  | Impact            | Délai |
 | ------------------- | ----------- | ------- | ----------------------------- | ---------------------------------- | ----------------- | ----- |
-| `GET /boats`        | 450ms       | < 200ms | Temps de réponse lent         | Mise en cache Redis (TTL 5min)     | ⚡ -60% latence   | 24h   |
-| `GET /boats/search` | 800ms       | < 300ms | Requêtes Elasticsearch lentes | Optimisation index + pagination    | ⚡ -70% latence   | 48h   |
+| `GET /boats`        | 56ms       | < 200ms | Temps de réponse bon         | Mise en cache Redis (TTL 5min)     | ⚡ -60% latence   | 24h   |
+| `GET /boats/search` | 84ms       | < 200ms | Requêtes Elasticsearch lentes | Optimisation index + pagination    | ⚡ -70% latence   | 48h   |
 | `POST /boats`       | 3% erreurs  | < 0.5%  | Validation failing            | Amélioration messages d'erreur Zod | 🔧 -80% erreurs   | 16h   |
-| `PUT /boats/:id`    | 550ms       | < 500ms | Sync MongoDB-Elasticsearch    | Indexation asynchrone (queue)      | ⚡ -40% latence   | 72h   |
+| `PUT /boats/:id`    | 84ms       | < 200ms | Sync MongoDB-Elasticsearch    | Indexation asynchrone (queue)      | ⚡ -40% latence   | 72h   |
 | `DELETE /boats/:id` | 2% erreurs  | < 1%    | Contraintes référentielles    | Soft delete + cascade cleanup      | 🔧 -90% erreurs   | 48h   |
 | **Infrastructure**  | CPU 85%     | < 80%   | Surcharge serveur             | Horizontal scaling (2→4 instances) | 📈 +100% capacité | 12h   |
 
