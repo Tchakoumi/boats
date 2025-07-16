@@ -1,0 +1,132 @@
+config:
+  target: 'http://localhost:3000'
+  phases:
+    - duration: 60
+      arrivalRate: 30
+      name: "Normal hours load test"
+  defaults:
+    headers:
+      Content-Type: 'application/json'
+  payload:
+    path: './data/boats.csv'
+    fields:
+      - name
+      - type
+      - year
+  processor: './processors/boat-processor.cjs'
+  plugins:
+    publish-metrics:
+      - type: artillery-plugin-publish-metrics
+        tags:
+          - "environment:load-test"
+          - "service:sailingloc"
+          - "scenario:normal-hours"
+          - "team:backend"
+    ensure:
+      thresholds:
+        - http.response_time.p95: 200
+        - http.response_time.p99: 500
+        - http.request_rate: 100
+      conditions:
+        - expression: "http.codes.200 > 95"
+          strict: false
+
+scenarios:
+  # Health check scenario - 5%
+  - name: "Health check"
+    weight: 5
+    flow:
+      - get:
+          url: "/"
+          capture:
+            - json: "$.status"
+              as: "health_status"
+      - think: 1
+
+  # Browse boats scenario - 35%
+  - name: "Browse boats"
+    weight: 35
+    flow:
+      - get:
+          url: "/boats"
+          expect:
+            - statusCode: 200
+            - hasProperty: "length"
+          capture:
+            - json: "$[0].id"
+              as: "boat_id"
+              ifExists: true
+      - think: 0.5
+
+  # Search boats scenario - 25%
+  - name: "Search boats"
+    weight: 25
+    flow:
+      - get:
+          url: "/boats/search"
+          qs:
+            q: "{{ $randomString() }}"
+            type: "{{ $randomPick(['Sailboat', 'Motorboat', 'Yacht']) }}"
+            yearMin: "{{ $randomInt(2000, 2010) }}"
+            yearMax: "{{ $randomInt(2015, 2024) }}"
+          expect:
+            - statusCode: 200
+      - think: 0.5
+
+  # Create boat scenario - 15%
+  - name: "Create boat"
+    weight: 15
+    flow:
+      - post:
+          url: "/boats"
+          json:
+            name: "{{ name }}"
+            type: "{{ type }}"
+            year: "{{ year }}"
+          expect:
+            - statusCode: 201
+            - hasProperty: "id"
+          capture:
+            - json: "$.id"
+              as: "created_boat_id"
+      - think: 0.5
+
+  # Update boat scenario - 15%
+  - name: "Update boat"
+    weight: 15
+    flow:
+      - get:
+          url: "/boats"
+          capture:
+            - json: "$[0].id"
+              as: "boat_id"
+              ifExists: true
+      - put:
+          url: "/boats/{{ boat_id }}"
+          json:
+            name: "Updated {{ $randomString() }}"
+            year: "{{ $randomInt(2000, 2024) }}"
+          expect:
+            - statusCode: 200
+          ifTrue: "boat_id"
+      - think: 0.5
+
+  # Delete boat scenario - 5%  
+  - name: "Delete boat"
+    weight: 5
+    flow:
+      - post:
+          url: "/boats"
+          json:
+            name: "ToDelete {{ $randomString() }}"
+            type: "{{ $randomPick(['Sailboat', 'Motorboat']) }}"
+            year: "{{ $randomInt(2000, 2024) }}"
+          capture:
+            - json: "$.id"
+              as: "delete_boat_id"
+      - delete:
+          url: "/boats/{{ delete_boat_id }}"
+          expect:
+            - statusCode: 204
+          ifTrue: "delete_boat_id"
+      - think: 0.5

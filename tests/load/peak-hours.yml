@@ -1,0 +1,146 @@
+config:
+  target: 'http://localhost:3000'
+  phases:
+    # Ramp up to peak
+    - duration: 30
+      arrivalRate: 10
+      rampTo: 70
+      name: "Ramp up to peak hours"
+    # Sustained peak load
+    - duration: 60  # 170 minutes
+      arrivalRate: 70
+      name: "Peak hours sustained load"
+    # Ramp down
+    - duration: 30
+      arrivalRate: 70
+      rampTo: 10
+      name: "Ramp down from peak"
+  defaults:
+    headers:
+      Content-Type: 'application/json'
+  payload:
+    path: './data/boats.csv'
+    fields:
+      - name
+      - type
+      - year
+  processor: './processors/boat-processor.cjs'
+  plugins:
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+    publish-metrics:
+      - type: artillery-plugin-publish-metrics
+        tags:
+          - "environment:load-test"
+          - "service:sailingloc"
+          - "scenario:peak-hours"
+          - "team:backend"
+          - "duration:3h"
+    ensure:
+      thresholds:
+        - http.response_time.p95: 300
+        - http.response_time.p99: 800
+        - http.request_rate: 250
+      conditions:
+        - expression: "http.codes.200 > 90"
+          strict: false
+
+scenarios:
+  # Professional marina users - high activity
+  - name: "Marina professional workflow"
+    weight: 40
+    flow:
+      # Bulk operations typical of marina management
+      - loop:
+          - get:
+              url: "/boats"
+              name: "List all boats"
+              expect:
+                - statusCode: 200
+              capture:
+                - json: "$[*].id"
+                  as: "boat_ids"
+
+          - post:
+              url: "/boats"
+              name: "Create new boat"
+              json:
+                name: "Marina {{ $randomString() }}"
+                type: "{{ $randomPick(['Sailboat', 'Motorboat', 'Yacht', 'Ferry']) }}"
+                year: "{{ $randomInt(2015, 2024) }}"
+              expect:
+                - statusCode: 201
+              capture:
+                - json: "$.id"
+                  as: "new_boat_id"
+
+          - get:
+              url: "/boats/search"
+              name: "Search boats by type"
+              qs:
+                type: "{{ $randomPick(['Sailboat', 'Motorboat', 'Yacht']) }}"
+                yearMin: "2020"
+              expect:
+                - statusCode: 200
+
+          - think: 1
+        count: 3
+
+  # Broker intensive search patterns
+  - name: "Broker search workflow"
+    weight: 35
+    flow:
+      - loop:
+          - get:
+              url: "/boats/search"
+              name: "Complex search query"
+              qs:
+                q: "{{ $randomPick(['luxury', 'sport', 'classic', 'new']) }}"
+                type: "{{ $randomPick(['Yacht', 'Sailboat', 'Motorboat']) }}"
+                yearMin: "{{ $randomInt(2010, 2018) }}"
+                yearMax: "{{ $randomInt(2019, 2024) }}"
+              expect:
+                - statusCode: 200
+
+          - get:
+              url: "/boats"
+              name: "Browse all listings"
+              expect:
+                - statusCode: 200
+
+          - think: 0.5
+        count: 5
+
+  # Individual owners - occasional updates
+  - name: "Owner update workflow"
+    weight: 25
+    flow:
+      - get:
+          url: "/boats"
+          name: "Check my boats"
+          expect:
+            - statusCode: 200
+          capture:
+            - json: "$[0].id"
+              as: "boat_id"
+              ifExists: true
+
+      - put:
+          url: "/boats/{{ boat_id }}"
+          name: "Update boat details"
+          json:
+            name: "Updated {{ $randomString() }}"
+            year: "{{ $randomInt(2000, 2024) }}"
+          expect:
+            - statusCode: 200
+          ifTrue: "boat_id"
+
+      - get:
+          url: "/boats/search"
+          name: "Search similar boats"
+          qs:
+            type: "Sailboat"
+          expect:
+            - statusCode: 200
+
+      - think: 3

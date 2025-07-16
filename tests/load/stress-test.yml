@@ -1,0 +1,128 @@
+config:
+  target: 'http://localhost:3000'
+  phases:
+    # Aggressive ramp up
+    - duration: 60
+      arrivalRate: 20
+      rampTo: 180
+      name: "Stress test ramp up"
+    # Maximum stress
+    - duration: 60  # 15 minutes
+      arrivalRate: 180
+      name: "Maximum stress load"
+    # Quick ramp down
+    - duration: 30
+      arrivalRate: 180
+      rampTo: 10
+      name: "Stress test ramp down"
+  defaults:
+    headers:
+      Content-Type: 'application/json'
+    timeout: 60  # Increased timeout for stress conditions
+  payload:
+    path: './data/boats.csv'
+    fields:
+      - name
+      - type
+      - year
+  processor: './processors/boat-processor.cjs'
+  plugins:
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+    publish-metrics:
+      - type: artillery-plugin-publish-metrics
+        tags:
+          - "environment:load-test"
+          - "service:sailingloc"
+          - "scenario:stress-test"
+          - "team:backend"
+          - "type:breaking-point"
+    ensure:
+      thresholds:
+        - http.response_time.p95: 3000
+        - http.response_time.p99: 5000
+        - http.request_rate: 1500
+      conditions:
+        - expression: "http.codes.200 > 70"
+          strict: false
+        - expression: "http.codes.500 < 20"
+          strict: false
+    expect:
+      outputFormat: json
+      outputFile: './reports/stress-test-results.json'
+
+scenarios:
+  # Read-heavy stress scenario - 70%
+  - name: "Read-heavy stress"
+    weight: 70
+    flow:
+      # Rapid reads
+      - get:
+          url: "/boats"
+          name: "GET /boats"
+          expect:
+            - statusCode: [200, 500, 503]
+
+      - get:
+          url: "/boats/search"
+          name: "GET /boats/search"
+          qs:
+            q: "{{ $randomString() }}"
+            type: "{{ $randomPick(['Sailboat', 'Motorboat', 'Yacht']) }}"
+          expect:
+            - statusCode: [200, 500, 503]
+
+      # Multiple search queries
+      - loop:
+          - get:
+              url: "/boats/search"
+              name: "Rapid search"
+              qs:
+                q: "{{ $randomString() }}"
+                yearMin: "{{ $randomInt(2000, 2020) }}"
+                yearMax: "2024"
+              expect:
+                - statusCode: [200, 500, 503]
+          - think: 0.1
+        count: 3
+
+  # Write-heavy stress scenario - 30%
+  - name: "Write-heavy stress"
+    weight: 30
+    flow:
+      # Create boat
+      - post:
+          url: "/boats"
+          name: "POST /boats"
+          json:
+            name: "Stress {{ $randomString() }}"
+            type: "{{ $randomPick(['Sailboat', 'Motorboat', 'Yacht', 'FishingBoat', 'Houseboat', 'Canoe', 'Kayak', 'Ferry', 'Speedboat', 'Tugboat']) }}"
+            year: "{{ $randomInt(1800, 2034) }}"
+          expect:
+            - statusCode: [201, 400, 500, 503]
+          capture:
+            - json: "$.id"
+              as: "stress_boat_id"
+              ifExists: true
+
+      # Update if created successfully
+      - put:
+          url: "/boats/{{ stress_boat_id }}"
+          name: "PUT /boats/:id"
+          json:
+            name: "Stress Updated {{ $randomString() }}"
+            type: "{{ $randomPick(['Yacht', 'Motorboat']) }}"
+            year: "{{ $randomInt(2020, 2024) }}"
+          expect:
+            - statusCode: [200, 404, 500, 503]
+          ifTrue: "stress_boat_id"
+
+      # Delete if exists
+      - delete:
+          url: "/boats/{{ stress_boat_id }}"
+          name: "DELETE /boats/:id"
+          expect:
+            - statusCode: [204, 404, 500, 503]
+          ifTrue: "stress_boat_id"
+
+      - think: 0.2
