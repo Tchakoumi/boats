@@ -632,47 +632,40 @@ model Boat {
 
 | Outil                | Langage | Avantages                                                                                                   | Inconvénients                                                  | Note       |
 | -------------------- | ------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ---------- |
-| **k6**               | JS / Go | - Performance native Go<br>- Scripting JavaScript familier<br>- Métriques détaillées<br>- Intégration CI/CD | - Pas de GUI intégrée<br>- Courbe d'apprentissage              | ⭐⭐⭐⭐⭐ |
-| **Artillery**        | JS      | - Configuration YAML simple<br>- Plugins extensibles<br>- Rapport HTML inclus<br>- Scenarios complexes      | - Moins performant que k6<br>- Limité pour stress test extrême | ⭐⭐⭐⭐   |
+| **Artillery**        | JS      | - Configuration YAML simple<br>- Plugins extensibles<br>- Rapport HTML inclus<br>- Scenarios complexes<br>- Artillery Cloud integration | - Moins performant que k6<br>- Limité pour stress test extrême | ⭐⭐⭐⭐⭐ |
+| **k6**               | JS / Go | - Performance native Go<br>- Scripting JavaScript familier<br>- Métriques détaillées<br>- Intégration CI/CD | - Pas de GUI intégrée<br>- Courbe d'apprentissage              | ⭐⭐⭐⭐   |
+| **Locust**           | Python  | - Interface web intuitive<br>- Scripting Python flexible<br>- Excellente pour tests distribués<br>- Monitoring temps réel | - Performances limitées sur machine unique<br>- Pas de YAML config | ⭐⭐⭐⭐   |
 | **Autocannon**       | JS      | - Ultra-léger et rapide<br>- API simple<br>- Parfait pour tests unitaires                                   | - Fonctionnalités limitées<br>- Pas de scenarios complexes     | ⭐⭐⭐     |
 | **Jest + Supertest** | JS      | - Intégration parfaite avec tests<br>- Debugging facile<br>- Assertions riches                              | - Pas fait pour load testing<br>- Performance limitée          | ⭐⭐       |
 
 ### Recommandation pour SailingLoc
 
-**Choix principal : k6**
+**Choix principal : Artillery**
 
-- Performance optimale pour nos objectifs (200 RPS)
-- Scriptage JavaScript naturel pour l'équipe
-- Monitoring intégré avec Grafana
-- Support Docker natif
+- Configuration YAML simple et lisible
+- Intégration native avec Artillery Cloud pour monitoring
+- Scenarios complexes avec workflows réalistes
+- Rapports HTML détaillés inclus
+- Scripts JavaScript personnalisés supportés
 
-**Configuration k6 recommandée** :
+**Configuration Artillery implémentée** :
 
-```javascript
-// loadtest.js
-import http from "k6/http";
-import { check } from "k6";
+Nous avons déjà mis en place une suite complète de tests Artillery dans le repository :
 
-export let options = {
-  stages: [
-    { duration: "5m", target: 200 }, // Ramp up
-    { duration: "15m", target: 200 }, // Plateau
-    { duration: "5m", target: 0 }, // Ramp down
-  ],
-  thresholds: {
-    http_req_duration: ["p(95)<500"], // 95% des requêtes < 500ms
-    http_req_failed: ["rate<0.01"], // < 1% d'erreurs
-  },
-};
+- `tests/load/normal-hours.yml` - Test heures normales (30 RPS)
+- `tests/load/peak-hours.yml` - Test heures de pointe (70 RPS)
+- `tests/load/stress-test.yml` - Test de stress (180 RPS)
+- `tests/load/run-tests.sh` - Script d'exécution automatisé
+- `tests/load/data/boats.csv` - Données de test réalistes
+- `tests/load/processors/boat-processor.cjs` - Processeur personnalisé
 
-export default function () {
-  let response = http.get("http://localhost:3000/boats");
-  check(response, {
-    "status is 200": (r) => r.status === 200,
-    "response time < 200ms": (r) => r.timings.duration < 200,
-  });
-}
-```
+**Avantages pratiques d'Artillery pour notre contexte** :
+
+- Support natif des fichiers YAML pour une configuration déclarative
+- Intégration Artillery Cloud pour monitoring temps réel
+- Processeurs JavaScript personnalisés pour logique métier
+- Gestion automatique des données de test (CSV)
+- Rapports détaillés avec métriques par endpoint
 
 ## 📊 Résumé exécutif
 
