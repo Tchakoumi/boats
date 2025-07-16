@@ -240,7 +240,7 @@ scenarios:
           url: "/boats"
           json:
             name: "{{ name }}"
-            type: "{{ type }}" 
+            type: "{{ type }}"
             year: "{{ year }}"
           weight: 15
       - think: 2
@@ -267,15 +267,15 @@ scenarios:
     flow:
       - loop:
           - get: { url: "/boats" }
-          - post: 
+          - post:
               url: "/boats"
               json:
                 name: "Marina {{ $randomString() }}"
                 type: "{{ $randomPick(['Ferry', 'Tugboat', 'Yacht']) }}"
           - think: 1
         count: 3
-        
-  # Brokers - 35% traffic  
+
+  # Brokers - 35% traffic
   - name: "Broker search workflow"
     weight: 35
     flow:
@@ -327,13 +327,13 @@ scenarios:
 ```
 tests/load/
 ├── normal-hours.yml      # Test heures normales (30 RPS, 60 min)
-├── peak-hours.yml        # Test heures de pointe (70 RPS, 3h)  
+├── peak-hours.yml        # Test heures de pointe (70 RPS, 3h)
 ├── stress-test.yml       # Test de stress (180 RPS, 30 min)
 ├── run-tests.sh          # Script d'exécution automatisé
 ├── data/
 │   └── boats.csv         # Données de test réalistes
 ├── processors/
-│   └── boat-processor.js # Processeur Artillery personnalisé
+│   └── boat-processor.cjs # Processeur Artillery personnalisé
 └── reports/              # Rapports générés automatiquement
 ```
 
@@ -374,14 +374,14 @@ cd tests/load
 
 **Menu interactif disponible** :
 1. Test Normal Hours (60s, 30 RPS) + Dashboard cloud
-2. Test Peak Hours (3h, 70 RPS) + Monitoring temps réel  
+2. Test Peak Hours (3h, 70 RPS) + Monitoring temps réel
 3. Test Stress (30min, 180 RPS) + Alertes automatiques
 4. Tous les tests (séquentiel) + Analyse complète
 5. Test rapide (10 VUs × 10 requêtes) + Validation immédiate
 
 **Tags automatiques pour organisation** :
 - `environment:load-test`
-- `service:sailingloc` 
+- `service:sailingloc`
 - `scenario:[normal-hours|peak-hours|stress-test]`
 - `team:backend`
 - `timestamp:YYYYMMDD-HHMMSS`
